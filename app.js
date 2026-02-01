@@ -212,6 +212,91 @@ let appData = {
         'Income': 'green',
         'Other': 'purple'
     },
+    merchantIcons: {
+        // Groceries
+        'whole foods': '🥬',
+        'trader joe': '🛒',
+        'safeway': '🛒',
+        'kroger': '🛒',
+        'walmart': '🏪',
+        'target': '🎯',
+        'costco': '📦',
+
+        // Dining
+        'starbucks': '☕',
+        'mcdonald': '🍔',
+        'chipotle': '🌯',
+        'subway': '🥪',
+        'pizza': '🍕',
+        'restaurant': '🍽️',
+        'cafe': '☕',
+        'coffee': '☕',
+        'burger': '🍔',
+        'sushi': '🍱',
+        'taco': '🌮',
+
+        // Transportation
+        'uber': '🚗',
+        'lyft': '🚕',
+        'shell': '⛽',
+        'chevron': '⛽',
+        'exxon': '⛽',
+        'gas': '⛽',
+        'parking': '🅿️',
+        'transit': '🚇',
+
+        // Shopping
+        'amazon': '📦',
+        'apple': '🍎',
+        'best buy': '💻',
+        'nike': '👟',
+        'gap': '👕',
+        'nordstrom': '👗',
+
+        // Bills & Utilities
+        'pg&e': '⚡',
+        'at&t': '📱',
+        'verizon': '📱',
+        'comcast': '📡',
+        'electric': '⚡',
+        'water': '💧',
+        'internet': '🌐',
+        'phone': '📱',
+
+        // Subscriptions
+        'netflix': '🎬',
+        'spotify': '🎵',
+        'amazon prime': '📺',
+        'youtube': '▶️',
+        'apple music': '🎵',
+        'gym': '💪',
+        'fitness': '💪',
+
+        // Entertainment
+        'cinema': '🎬',
+        'theater': '🎭',
+        'concert': '🎵',
+        'game': '🎮',
+
+        // Health
+        'pharmacy': '💊',
+        'doctor': '🏥',
+        'hospital': '🏥',
+        'dentist': '🦷',
+
+        // Travel
+        'airline': '✈️',
+        'hotel': '🏨',
+        'airbnb': '🏠',
+
+        // Income
+        'paycheck': '💰',
+        'salary': '💰',
+        'deposit': '💰',
+
+        // Default
+        'default': '💳'
+    },
     balanceHistory: [],
     settings: {
         showLiabilities: true,
@@ -431,12 +516,57 @@ function renderOverview() {
 
     const balanceTrend = calculateBalanceTrend();
     const cashFlow = calculateCashFlow(currentPeriod);
+    const financialHealth = calculateFinancialHealth();
+    const insights = getSpendingInsights();
 
     return `
         <div class="overview-view">
             ${balanceStale ? `
                 <div class="card" style="background: var(--accent-warning); color: var(--bg-primary);">
                     <strong>Update balances</strong> — Net worth may be stale. Update in Settings.
+                </div>
+            ` : ''}
+
+            <!-- Financial Health Score -->
+            <div class="card financial-health-card">
+                <div class="health-content">
+                    <div class="health-score-circle" style="--score: ${financialHealth.score}; --color: ${financialHealth.color}">
+                        <div class="score-value">${financialHealth.score}</div>
+                        <div class="score-label">${financialHealth.rating}</div>
+                    </div>
+                    <div class="health-details">
+                        <h3 class="health-title">Financial Health</h3>
+                        <p class="health-message">${financialHealth.message}</p>
+                        <div class="health-factors">
+                            <div class="factor">
+                                <span class="factor-label">Savings Rate</span>
+                                <span class="factor-value">${cashFlow.savingsRate.toFixed(0)}%</span>
+                            </div>
+                            <div class="factor">
+                                <span class="factor-label">Net Worth</span>
+                                <span class="factor-value">${formatCurrency(netWorth)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spending Insights -->
+            ${insights.length > 0 ? `
+                <div class="insights-section">
+                    <h3 class="section-title">💡 Insights</h3>
+                    <div class="insights-grid">
+                        ${insights.map(insight => `
+                            <div class="insight-card ${insight.type}">
+                                <div class="insight-icon">${insight.icon}</div>
+                                <div class="insight-content">
+                                    <div class="insight-title">${insight.title}</div>
+                                    <div class="insight-description">${insight.description}</div>
+                                    <div class="insight-value">${insight.value}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             ` : ''}
 
@@ -599,9 +729,13 @@ function renderTransactions() {
                     <div class="group-date">${formatDate(date, 'MMM DD, YYYY')}</div>
                     ${grouped[date].map(txn => `
                         <div class="transaction-item" data-txn-id="${txn.id}">
+                            <div class="txn-merchant-icon">${getMerchantIcon(txn.merchant)}</div>
                             <div class="txn-info">
                                 <div class="txn-merchant">${txn.merchant}</div>
-                                <div class="txn-category">${txn.category}</div>
+                                <div class="txn-category-row">
+                                    <span class="txn-category">${txn.category}</span>
+                                    ${txn.receipt ? '<span class="receipt-indicator">📎</span>' : ''}
+                                </div>
                             </div>
                             <div class="txn-amount ${txn.type === 'expense' ? 'negative' : 'positive'}">
                                 ${txn.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(txn.amount))}
@@ -1508,6 +1642,7 @@ function renderRecentTransactions(limit) {
         <div class="transaction-list">
             ${recent.map(txn => `
                 <div class="transaction-list-item">
+                    <div class="txn-merchant-icon">${getMerchantIcon(txn.merchant)}</div>
                     <div class="txn-info">
                         <div class="txn-merchant">${txn.merchant}</div>
                         <div class="txn-category">${txn.category}</div>
@@ -2007,6 +2142,166 @@ function formatDate(date, format = 'MMM DD, YYYY') {
 
 function generateId() {
     return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function getMerchantIcon(merchant) {
+    if (!merchant) return appData.merchantIcons['default'];
+
+    const lowerMerchant = merchant.toLowerCase();
+
+    // Check for exact or partial matches
+    for (const [key, icon] of Object.entries(appData.merchantIcons)) {
+        if (lowerMerchant.includes(key)) {
+            return icon;
+        }
+    }
+
+    return appData.merchantIcons['default'];
+}
+
+function calculateFinancialHealth() {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Factor 1: Savings rate (40% weight)
+    const cashFlow = calculateCashFlow('1M');
+    const savingsRateScore = Math.min(100, Math.max(0, cashFlow.savingsRate * 2)); // 50% = 100 points
+
+    // Factor 2: Spending consistency (30% weight)
+    const last3MonthsSpend = [];
+    for (let i = 0; i < 3; i++) {
+        const month = currentMonth - i;
+        const year = month < 0 ? currentYear - 1 : currentYear;
+        const adjustedMonth = month < 0 ? 12 + month : month;
+        last3MonthsSpend.push(calculateMonthlySpend(adjustedMonth, year));
+    }
+    const avgSpend = last3MonthsSpend.reduce((a, b) => a + b, 0) / last3MonthsSpend.length;
+    const variance = last3MonthsSpend.reduce((sum, spend) => sum + Math.abs(spend - avgSpend), 0) / last3MonthsSpend.length;
+    const consistencyScore = avgSpend > 0 ? Math.max(0, 100 - (variance / avgSpend * 100)) : 100;
+
+    // Factor 3: Net worth trend (30% weight)
+    const netWorth = appData.accounts.find(a => a.id === 'td').balance -
+                     appData.accounts.find(a => a.id === 'discover').balance;
+    const trend = calculateBalanceTrend();
+    const netWorthScore = netWorth > 0 ?
+        Math.min(100, 50 + trend.percentChange) :
+        Math.max(0, 50 + trend.percentChange);
+
+    // Calculate weighted score
+    const totalScore = (savingsRateScore * 0.4) + (consistencyScore * 0.3) + (netWorthScore * 0.3);
+
+    let rating, color, message;
+    if (totalScore >= 80) {
+        rating = 'Excellent';
+        color = 'var(--accent-positive)';
+        message = 'Your finances are in great shape! 🌟';
+    } else if (totalScore >= 60) {
+        rating = 'Good';
+        color = 'var(--accent-blue)';
+        message = 'You\'re doing well. Keep it up! 👍';
+    } else if (totalScore >= 40) {
+        rating = 'Fair';
+        color = 'var(--accent-warning)';
+        message = 'Room for improvement. Small changes matter! 💡';
+    } else {
+        rating = 'Needs Work';
+        color = 'var(--accent-negative)';
+        message = 'Let\'s build better habits together! 💪';
+    }
+
+    return { score: Math.round(totalScore), rating, color, message };
+}
+
+function getSpendingInsights() {
+    const now = new Date();
+    const insights = [];
+
+    // Top merchant this month
+    const merchantTotals = {};
+    appData.transactions
+        .filter(txn => {
+            const txnDate = new Date(txn.date);
+            return txnDate.getMonth() === now.getMonth() &&
+                   txnDate.getFullYear() === now.getFullYear() &&
+                   txn.type === 'expense';
+        })
+        .forEach(txn => {
+            merchantTotals[txn.merchant] = (merchantTotals[txn.merchant] || 0) + txn.amount;
+        });
+
+    const sortedMerchants = Object.entries(merchantTotals).sort(([, a], [, b]) => b - a);
+    if (sortedMerchants.length > 0) {
+        const [merchant, amount] = sortedMerchants[0];
+        insights.push({
+            icon: getMerchantIcon(merchant),
+            title: 'Top Merchant',
+            description: merchant,
+            value: formatCurrency(amount),
+            type: 'merchant'
+        });
+    }
+
+    // Unusual spending detection
+    const thisMonthSpend = calculateMonthlySpend(now.getMonth(), now.getFullYear());
+    const lastMonthSpend = calculateMonthlySpend(
+        now.getMonth() === 0 ? 11 : now.getMonth() - 1,
+        now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+    );
+
+    if (lastMonthSpend > 0) {
+        const percentChange = ((thisMonthSpend - lastMonthSpend) / lastMonthSpend) * 100;
+        if (Math.abs(percentChange) > 20) {
+            insights.push({
+                icon: percentChange > 0 ? '📈' : '📉',
+                title: percentChange > 0 ? 'Spending Up' : 'Spending Down',
+                description: `${Math.abs(percentChange).toFixed(0)}% vs last month`,
+                value: formatCurrency(thisMonthSpend),
+                type: percentChange > 0 ? 'warning' : 'positive'
+            });
+        }
+    }
+
+    // Frequent small purchases
+    const smallPurchases = appData.transactions.filter(txn => {
+        const txnDate = new Date(txn.date);
+        return txnDate.getMonth() === now.getMonth() &&
+               txnDate.getFullYear() === now.getFullYear() &&
+               txn.amount < 10 &&
+               txn.type === 'expense';
+    });
+
+    if (smallPurchases.length >= 10) {
+        const total = smallPurchases.reduce((sum, txn) => sum + txn.amount, 0);
+        insights.push({
+            icon: '☕',
+            title: 'Small Purchases',
+            description: `${smallPurchases.length} purchases under $10`,
+            value: formatCurrency(total),
+            type: 'info'
+        });
+    }
+
+    // Largest transaction this week
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const largestThisWeek = appData.transactions
+        .filter(txn => {
+            const txnDate = new Date(txn.date);
+            return txnDate >= weekAgo && txn.type === 'expense';
+        })
+        .sort((a, b) => b.amount - a.amount)[0];
+
+    if (largestThisWeek && largestThisWeek.amount > 100) {
+        insights.push({
+            icon: getMerchantIcon(largestThisWeek.merchant),
+            title: 'Largest This Week',
+            description: largestThisWeek.merchant,
+            value: formatCurrency(largestThisWeek.amount),
+            type: 'info'
+        });
+    }
+
+    return insights.slice(0, 4); // Max 4 insights
 }
 
 function updateAccountBalance(accountId, amount, type, reverse = false) {
