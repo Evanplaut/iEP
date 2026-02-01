@@ -1,0 +1,38 @@
+{
+  "accounts": [
+    {
+      "id": "td",
+      "name": "TD Checking",
+      "type": "asset",
+      "balance": 0
+    },
+    {
+      "id": "discover",
+      "name": "Discover Card",
+      "type": "liability",
+      "balance": 0
+    }
+  ],
+  "transactions": [],
+  "rules": [],
+  "bills": [],
+  "alerts": [],
+  "categories": [
+    "Groceries",
+    "Dining & Restaurants",
+    "Transportation",
+    "Shopping",
+    "Bills & Utilities",
+    "Subscriptions",
+    "Entertainment",
+    "Health & Wellness",
+    "Travel",
+    "Income",
+    "Other"
+  ],
+  "settings": {
+    "showLiabilities": true,
+    "lastImportDate": null,
+    "lastBalanceUpdate": null
+  }
+}
