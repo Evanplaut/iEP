@@ -712,10 +712,384 @@ body {
     color: var(--text-secondary);
 }
 
+/* ========================================
+   BALANCE TREND & ANALYTICS
+   ======================================== */
+
+.balance-trend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.balance-trend.up {
+    color: var(--accent-positive);
+}
+
+.balance-trend.down {
+    color: var(--accent-negative);
+}
+
+.trend-arrow {
+    font-size: var(--font-size-lg);
+}
+
+.trend-amount {
+    font-weight: 700;
+}
+
+.trend-percent {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Period Selector */
+.period-selector {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    background: var(--bg-card);
+    padding: 6px;
+    border-radius: 12px;
+    overflow-x: auto;
+}
+
+.period-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.period-btn.active {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.period-btn:hover:not(.active) {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+/* Chart Containers */
+.chart-container {
+    width: 100%;
+    height: 300px;
+    position: relative;
+    margin-top: var(--spacing-md);
+}
+
+.chart-container canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.pie-chart-container {
+    height: 400px;
+}
+
+/* Analytics Grid */
+.analytics-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.quick-stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+}
+
+/* ========================================
+   NUMERIC KEYPAD
+   ======================================== */
+
+.numeric-keypad-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.amount-display {
+    background: var(--bg-elevated);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: var(--spacing-lg);
+    text-align: right;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    font-family: -apple-system, BlinkMacSystemFont, 'Menlo', 'Monaco', monospace;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.numeric-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.keypad-btn {
+    aspect-ratio: 1;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.keypad-btn:active {
+    background: var(--bg-card);
+    border-color: var(--accent-blue);
+    transform: scale(0.95);
+}
+
+.keypad-clear {
+    background: var(--accent-negative);
+    color: white;
+    border-color: var(--accent-negative);
+}
+
+.keypad-clear:active {
+    background: color-mix(in srgb, var(--accent-negative) 80%, black);
+    border-color: var(--accent-negative);
+}
+
+/* ========================================
+   CATEGORY COLOR TAGS
+   ======================================== */
+
+.category-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.category-tag-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Category color palette */
+.category-color-blue { background: color-mix(in srgb, var(--accent-blue) 20%, var(--bg-card)); color: var(--accent-blue); }
+.category-color-blue .category-tag-dot { background: var(--accent-blue); }
+
+.category-color-green { background: color-mix(in srgb, var(--accent-positive) 20%, var(--bg-card)); color: var(--accent-positive); }
+.category-color-green .category-tag-dot { background: var(--accent-positive); }
+
+.category-color-red { background: color-mix(in srgb, var(--accent-negative) 20%, var(--bg-card)); color: var(--accent-negative); }
+.category-color-red .category-tag-dot { background: var(--accent-negative); }
+
+.category-color-orange { background: color-mix(in srgb, var(--accent-warning) 20%, var(--bg-card)); color: var(--accent-warning); }
+.category-color-orange .category-tag-dot { background: var(--accent-warning); }
+
+.category-color-purple { background: color-mix(in srgb, #bf5af0 20%, var(--bg-card)); color: #bf5af0; }
+.category-color-purple .category-tag-dot { background: #bf5af0; }
+
+.category-color-pink { background: color-mix(in srgb, #ff2d55 20%, var(--bg-card)); color: #ff2d55; }
+.category-color-pink .category-tag-dot { background: #ff2d55; }
+
+.category-color-yellow { background: color-mix(in srgb, #ffd60a 20%, var(--bg-card)); color: #ffd60a; }
+.category-color-yellow .category-tag-dot { background: #ffd60a; }
+
+/* ========================================
+   RECEIPT PHOTO FEATURES
+   ======================================== */
+
+.receipt-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.btn-receipt-camera {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 15px;
+    touch-action: manipulation;
+}
+
+#receiptThumbnail,
+#editReceiptThumbnail {
+    position: relative;
+}
+
+#receiptThumb,
+#editReceiptThumb {
+    display: block;
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+}
+
+#receiptThumb:active,
+#editReceiptThumb:active {
+    transform: scale(0.95);
+}
+
+.modal-receipt {
+    max-width: 90vw;
+    max-height: 90vh;
+}
+
+.receipt-viewer-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+}
+
+/* ========================================
+   BUDGET PROGRESS BARS
+   ======================================== */
+
+.budget-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.budget-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.budget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.budget-category {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.category-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.category-name {
+    font-weight: 600;
+    font-size: var(--font-size-base);
+}
+
+.budget-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.budget-amount {
+    font-weight: 700;
+    font-size: var(--font-size-lg);
+}
+
+.budget-percentage {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.budget-progress {
+    width: 100%;
+    height: 12px;
+    background: var(--bg-elevated);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.budget-progress-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width var(--transition-base);
+    position: relative;
+}
+
+.budget-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.budget-total {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 2px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-label {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.total-amount {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+}
+
 /* Responsive - Tablet */
 @media (min-width: 768px) {
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .analytics-grid {
+        grid-template-columns: 1.2fr 0.8fr;
     }
 
     .fab {
@@ -743,7 +1117,23 @@ body {
         grid-template-columns: repeat(3, 1fr);
     }
 
+    .analytics-grid {
+        grid-template-columns: 1.5fr 1fr;
+    }
+
+    .quick-stats {
+        grid-template-columns: 1fr;
+    }
+
     .main-content {
         padding: var(--spacing-xl);
+    }
+
+    .chart-container {
+        height: 350px;
+    }
+
+    .pie-chart-container {
+        height: 450px;
     }
 }

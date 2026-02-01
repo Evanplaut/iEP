@@ -145,7 +145,24 @@
                     </div>
                     <div class="form-group">
                         <label>Amount</label>
-                        <input type="number" id="txnAmount" step="0.01" placeholder="0.00" required>
+                        <div class="numeric-keypad-wrapper">
+                            <div class="amount-display" id="amountDisplay">$0.00</div>
+                            <div class="numeric-keypad">
+                                <button type="button" class="keypad-btn" data-key="1">1</button>
+                                <button type="button" class="keypad-btn" data-key="2">2</button>
+                                <button type="button" class="keypad-btn" data-key="3">3</button>
+                                <button type="button" class="keypad-btn" data-key="4">4</button>
+                                <button type="button" class="keypad-btn" data-key="5">5</button>
+                                <button type="button" class="keypad-btn" data-key="6">6</button>
+                                <button type="button" class="keypad-btn" data-key="7">7</button>
+                                <button type="button" class="keypad-btn" data-key="8">8</button>
+                                <button type="button" class="keypad-btn" data-key="9">9</button>
+                                <button type="button" class="keypad-btn" data-key=".">.</button>
+                                <button type="button" class="keypad-btn" data-key="0">0</button>
+                                <button type="button" class="keypad-btn keypad-clear" data-key="clear">C</button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="txnAmount" required>
                     </div>
                     <div class="form-group">
                         <label>Merchant</label>
@@ -159,6 +176,16 @@
                     <div class="form-group">
                         <label>Notes (optional)</label>
                         <input type="text" id="txnNotes" placeholder="Additional details">
+                    </div>
+                    <div class="form-group receipt-group">
+                        <label>Receipt Photo (optional)</label>
+                        <button type="button" class="btn-secondary btn-receipt-camera" id="receiptCameraBtn" title="Capture receipt photo">
+                            📷 Capture Receipt
+                        </button>
+                        <input type="file" id="receiptInput" accept="image/*" capture="environment" style="display: none;">
+                        <div id="receiptThumbnail" style="display: none; margin-top: 8px;">
+                            <img id="receiptThumb" style="max-width: 100px; height: auto; border-radius: 8px; border: 1px solid var(--border-color);">
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="closeQuickAdd()">Cancel</button>
@@ -245,12 +272,35 @@
                         <label>Notes</label>
                         <input type="text" id="editTxnNotes">
                     </div>
+                    <div class="form-group receipt-group">
+                        <label>Receipt Photo (optional)</label>
+                        <button type="button" class="btn-secondary btn-receipt-camera" id="editReceiptCameraBtn" title="Capture receipt photo">
+                            📷 Capture Receipt
+                        </button>
+                        <input type="file" id="editReceiptInput" accept="image/*" capture="environment" style="display: none;">
+                        <div id="editReceiptThumbnail" style="display: none; margin-top: 8px;">
+                            <img id="editReceiptThumb" style="max-width: 100px; height: auto; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;" title="Click to view full receipt">
+                        </div>
+                    </div>
                     <div class="form-actions">
                         <button type="button" class="btn-danger" onclick="deleteTransaction()">Delete</button>
                         <button type="button" class="btn-secondary" onclick="closeEditTransaction()">Cancel</button>
                         <button type="submit" class="btn-primary">Save</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Receipt Viewer Modal -->
+        <div id="receiptViewerModal" class="modal">
+            <div class="modal-content modal-receipt">
+                <div class="modal-header">
+                    <h2>Receipt</h2>
+                    <button class="close-btn" onclick="closeReceiptViewer()">&times;</button>
+                </div>
+                <div class="receipt-viewer-content">
+                    <img id="receiptViewerImage" src="" alt="Receipt" style="max-width: 100%; height: auto; border-radius: 8px;">
+                </div>
             </div>
         </div>
 

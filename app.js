@@ -199,6 +199,20 @@ let appData = {
         'Income',
         'Other'
     ],
+    categoryColors: {
+        'Groceries': 'blue',
+        'Dining & Restaurants': 'orange',
+        'Transportation': 'green',
+        'Shopping': 'pink',
+        'Bills & Utilities': 'red',
+        'Subscriptions': 'purple',
+        'Entertainment': 'yellow',
+        'Health & Wellness': 'green',
+        'Travel': 'blue',
+        'Income': 'green',
+        'Other': 'purple'
+    },
+    balanceHistory: [],
     settings: {
         showLiabilities: true,
         lastImportDate: null,
@@ -209,6 +223,8 @@ let appData = {
 let currentView = 'overview';
 let currentTransaction = null;
 let importedData = null;
+let keypadValue = '0';
+let receiptData = null;
 
 // ========================================
 // INITIALIZATION
@@ -283,6 +299,41 @@ function initializeApp() {
             }, 100);
         });
     }
+
+    // Numeric Keypad
+    document.querySelectorAll('.keypad-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleKeypadPress(e.currentTarget.dataset.key);
+        });
+    });
+
+    // Receipt Camera Button
+    const receiptCameraBtn = document.getElementById('receiptCameraBtn');
+    if (receiptCameraBtn) {
+        receiptCameraBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('receiptInput').click();
+        });
+    }
+
+    const receiptInput = document.getElementById('receiptInput');
+    if (receiptInput) {
+        receiptInput.addEventListener('change', handleReceiptCapture);
+    }
+
+    const editReceiptCameraBtn = document.getElementById('editReceiptCameraBtn');
+    if (editReceiptCameraBtn) {
+        editReceiptCameraBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('editReceiptInput').click();
+        });
+    }
+
+    const editReceiptInput = document.getElementById('editReceiptInput');
+    if (editReceiptInput) {
+        editReceiptInput.addEventListener('change', handleEditReceiptCapture);
+    }
 }
 
 function populateCategoryDropdowns() {
@@ -329,6 +380,11 @@ function renderView() {
     switch (currentView) {
         case 'overview':
             container.innerHTML = renderOverview();
+            // Render charts after DOM is ready
+            setTimeout(() => {
+                renderBalanceLineChart('balanceTrendChart', currentPeriod);
+                renderCategoryPieChart('categoryPieChart', currentPeriod);
+            }, 0);
             break;
         case 'accounts':
             container.innerHTML = renderAccounts();
@@ -367,15 +423,14 @@ function renderOverview() {
     const currentYear = now.getFullYear();
 
     const monthlySpend = calculateMonthlySpend(currentMonth, currentYear);
-    const lastMonthSpend = calculateMonthlySpend(currentMonth - 1, currentYear);
-    const spendChange = lastMonthSpend > 0 ? ((monthlySpend - lastMonthSpend) / lastMonthSpend * 100) : 0;
-
     const topCategory = getTopCategory(currentMonth, currentYear);
-    const largestThisWeek = getLargestTransactionThisWeek();
     const subscriptionBurn = calculateSubscriptionBurn();
 
     const balanceStale = !appData.settings.lastBalanceUpdate ||
         (Date.now() - new Date(appData.settings.lastBalanceUpdate).getTime()) > 24 * 60 * 60 * 1000;
+
+    const balanceTrend = calculateBalanceTrend();
+    const cashFlow = calculateCashFlow(currentPeriod);
 
     return `
         <div class="overview-view">
@@ -385,69 +440,100 @@ function renderOverview() {
                 </div>
             ` : ''}
 
+            <!-- Main Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-label">Net Worth</div>
                     <div class="stat-value ${netWorth >= 0 ? 'positive' : 'negative'}">
                         ${formatCurrency(netWorth)}
                     </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-label">Monthly Spend MTD</div>
-                    <div class="stat-value">${formatCurrency(monthlySpend)}</div>
-                    ${lastMonthSpend > 0 ? `
-                        <div class="stat-change ${spendChange > 0 ? 'up' : 'down'}">
-                            ${spendChange > 0 ? '↑' : '↓'} ${Math.abs(spendChange).toFixed(1)}% vs last month
+                    ${balanceTrend.change !== 0 ? `
+                        <div class="balance-trend ${balanceTrend.direction}">
+                            <span class="trend-arrow">${balanceTrend.direction === 'up' ? '↑' : '↓'}</span>
+                            <span class="trend-amount">${formatCurrency(Math.abs(balanceTrend.change))}</span>
+                            <span class="trend-percent">(${Math.abs(balanceTrend.percentChange).toFixed(1)}%) this month</span>
                         </div>
                     ` : ''}
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-label">Top Category This Month</div>
-                    <div class="stat-value" style="font-size: 18px;">${topCategory.category}</div>
-                    <div class="stat-change">${formatCurrency(topCategory.amount)}</div>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Largest This Week</div>
-                    <div class="stat-value" style="font-size: 18px;">
-                        ${largestThisWeek.merchant || 'None'}
+                    <div class="stat-label">Cash Flow</div>
+                    <div class="stat-value ${cashFlow.netCashFlow >= 0 ? 'positive' : 'negative'}" id="cashFlowValue">
+                        ${formatCurrency(cashFlow.netCashFlow)}
                     </div>
-                    <div class="stat-change">${formatCurrency(largestThisWeek.amount)}</div>
+                    <div class="stat-change">
+                        Income: ${formatCurrency(cashFlow.income)} | Expenses: ${formatCurrency(cashFlow.expenses)}
+                    </div>
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-label">Monthly Subscriptions</div>
-                    <div class="stat-value">${formatCurrency(subscriptionBurn)}</div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-label">Liabilities</div>
-                    <div class="stat-value negative">${formatCurrency(discoverBalance)}</div>
-                    <button class="btn-small btn-secondary" style="margin-top: 8px;" onclick="toggleLiabilities()">
-                        ${appData.settings.showLiabilities ? 'Hide' : 'Show'} Details
-                    </button>
+                    <div class="stat-label">Savings Rate</div>
+                    <div class="stat-value ${cashFlow.savingsRate >= 0 ? 'positive' : 'negative'}" id="savingsRateValue">
+                        ${cashFlow.savingsRate.toFixed(1)}%
+                    </div>
+                    <div class="stat-change">
+                        ${cashFlow.savingsRate >= 20 ? '💰 Excellent' : cashFlow.savingsRate >= 10 ? '👍 Good' : '📊 Building'}
+                    </div>
                 </div>
             </div>
 
-            ${appData.settings.showLiabilities ? `
+            <!-- Period Selector -->
+            <div class="period-selector">
+                <button class="period-btn ${currentPeriod === '1M' ? 'active' : ''}" data-period="1M" onclick="setPeriod('1M')">1M</button>
+                <button class="period-btn ${currentPeriod === '3M' ? 'active' : ''}" data-period="3M" onclick="setPeriod('3M')">3M</button>
+                <button class="period-btn ${currentPeriod === '1Y' ? 'active' : ''}" data-period="1Y" onclick="setPeriod('1Y')">1Y</button>
+                <button class="period-btn ${currentPeriod === 'YTD' ? 'active' : ''}" data-period="YTD" onclick="setPeriod('YTD')">YTD</button>
+                <button class="period-btn ${currentPeriod === 'MAX' ? 'active' : ''}" data-period="MAX" onclick="setPeriod('MAX')">MAX</button>
+            </div>
+
+            <!-- Balance Trend Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Balance Trend</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="balanceTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Analytics Grid -->
+            <div class="analytics-grid">
+                <!-- Category Breakdown -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Discover Card</h3>
+                        <h3 class="card-title">Spending Breakdown</h3>
                     </div>
-                    <div class="stat-value negative">${formatCurrency(discoverBalance)}</div>
-                    <div class="card-subtitle">Balance Owed</div>
+                    <div class="chart-container pie-chart-container">
+                        <canvas id="categoryPieChart"></canvas>
+                    </div>
                 </div>
-            ` : ''}
 
+                <!-- Quick Stats -->
+                <div class="quick-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Top Category</div>
+                        <div class="stat-value" style="font-size: 18px;">${topCategory.category}</div>
+                        <div class="stat-change">${formatCurrency(topCategory.amount)}</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-label">Monthly Spend MTD</div>
+                        <div class="stat-value">${formatCurrency(monthlySpend)}</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-label">Subscriptions</div>
+                        <div class="stat-value">${formatCurrency(subscriptionBurn)}/mo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Recent Transactions</h3>
                 </div>
-                ${renderRecentTransactions(10)}
+                ${renderRecentTransactions(8)}
             </div>
         </div>
     `;
@@ -579,32 +665,60 @@ function renderCategories() {
 
     const totalSpend = Object.values(categorySpends).reduce((sum, amount) => sum + amount, 0);
 
+    // Color mapping for bars
+    const categoryColorMap = {
+        'Groceries': '#0a84ff',
+        'Dining & Restaurants': '#ff9f0a',
+        'Transportation': '#30d158',
+        'Shopping': '#ff2d55',
+        'Bills & Utilities': '#ff453a',
+        'Subscriptions': '#bf5af0',
+        'Entertainment': '#ffd60a',
+        'Health & Wellness': '#30d158',
+        'Travel': '#0a84ff',
+        'Income': '#30d158',
+        'Other': '#bf5af0'
+    };
+
     return `
         <div class="categories-view">
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">Spending by Category (This Month)</h2>
+                    <h2 class="card-title">Spending by Category</h2>
+                    <div class="card-subtitle">This Month</div>
                 </div>
                 ${sortedCategories.length === 0 ? `
                     <div class="empty-state">
                         <p>No spending this month</p>
                     </div>
                 ` : ''}
-                ${sortedCategories.map(([category, amount]) => {
-                    const percentage = totalSpend > 0 ? (amount / totalSpend * 100) : 0;
-                    return `
-                        <div class="category-item">
-                            <div class="category-info">
-                                <div class="category-name">${category}</div>
-                                <div class="category-amount">${formatCurrency(amount)}</div>
+                <div class="budget-bars">
+                    ${sortedCategories.map(([category, amount]) => {
+                        const percentage = totalSpend > 0 ? (amount / totalSpend * 100) : 0;
+                        const barColor = categoryColorMap[category] || '#bf5af0';
+                        return `
+                            <div class="budget-item">
+                                <div class="budget-header">
+                                    <div class="budget-category">
+                                        <span class="category-dot" style="background: ${barColor};"></span>
+                                        <span class="category-name">${category}</span>
+                                    </div>
+                                    <div class="budget-stats">
+                                        <span class="budget-amount">${formatCurrency(amount)}</span>
+                                        <span class="budget-percentage">${percentage.toFixed(0)}%</span>
+                                    </div>
+                                </div>
+                                <div class="budget-progress">
+                                    <div class="budget-progress-fill" style="width: ${percentage}%; background: ${barColor};"></div>
+                                </div>
                             </div>
-                            <div class="category-bar">
-                                <div class="category-fill" style="width: ${percentage}%;"></div>
-                            </div>
-                            <div class="category-percentage">${percentage.toFixed(1)}%</div>
-                        </div>
-                    `;
-                }).join('')}
+                        `;
+                    }).join('')}
+                </div>
+                <div class="budget-total">
+                    <span class="total-label">Total Spending</span>
+                    <span class="total-amount">${formatCurrency(totalSpend)}</span>
+                </div>
             </div>
         </div>
     `;
@@ -816,6 +930,97 @@ function renderAlertsList() {
 }
 
 // ========================================
+// NUMERIC KEYPAD
+// ========================================
+
+function handleKeypadPress(key) {
+    if (key === 'clear') {
+        keypadValue = '0';
+    } else if (key === '.') {
+        if (!keypadValue.includes('.')) {
+            if (keypadValue === '0') {
+                keypadValue = '0.';
+            } else {
+                keypadValue += '.';
+            }
+        }
+    } else {
+        if (keypadValue === '0') {
+            keypadValue = key;
+        } else {
+            keypadValue += key;
+        }
+    }
+    updateKeypadDisplay();
+}
+
+function updateKeypadDisplay() {
+    const display = document.getElementById('amountDisplay');
+    if (display) {
+        const num = parseFloat(keypadValue) || 0;
+        display.textContent = formatCurrency(num);
+        document.getElementById('txnAmount').value = num > 0 ? num.toFixed(2) : '';
+    }
+}
+
+// ========================================
+// RECEIPT PHOTO CAPTURE
+// ========================================
+
+function handleReceiptCapture(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        receiptData = event.target.result;
+        const thumbnail = document.getElementById('receiptThumbnail');
+        const thumb = document.getElementById('receiptThumb');
+        if (thumbnail && thumb) {
+            thumb.src = receiptData;
+            thumbnail.style.display = 'block';
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleEditReceiptCapture(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        if (currentTransaction) {
+            currentTransaction.receipt = event.target.result;
+        }
+        const thumbnail = document.getElementById('editReceiptThumbnail');
+        const thumb = document.getElementById('editReceiptThumb');
+        if (thumbnail && thumb) {
+            thumb.src = event.target.result;
+            thumbnail.style.display = 'block';
+            thumb.addEventListener('click', () => openReceiptViewer(event.target.result));
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function openReceiptViewer(imageData) {
+    const modal = document.getElementById('receiptViewerModal');
+    const img = document.getElementById('receiptViewerImage');
+    if (modal && img) {
+        img.src = imageData;
+        modal.classList.add('active');
+    }
+}
+
+function closeReceiptViewer() {
+    const modal = document.getElementById('receiptViewerModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// ========================================
 // QUICK ADD MODAL
 // ========================================
 
@@ -823,7 +1028,11 @@ function openQuickAdd() {
     const modal = document.getElementById('quickAddModal');
     if (modal) {
         modal.classList.add('active');
-        document.getElementById('quickAddAmount').focus();
+        // Reset keypad
+        keypadValue = '0';
+        updateKeypadDisplay();
+        receiptData = null;
+        document.getElementById('receiptThumbnail').style.display = 'none';
     }
 }
 
@@ -861,7 +1070,8 @@ function handleQuickAdd(e) {
         type,
         account,
         category,
-        notes: ''
+        notes: '',
+        receipt: receiptData || null
     };
 
     // Check for duplicates
@@ -870,8 +1080,10 @@ function handleQuickAdd(e) {
         updateAccountBalance(account, amount, type);
         saveData();
 
-        // Reset form
+        // Reset form and state
         document.getElementById('quickAddForm').reset();
+        keypadValue = '0';
+        receiptData = null;
         closeQuickAdd();
         renderView();
         updateAlertBanner();
@@ -900,6 +1112,17 @@ function openEditModal(txnId) {
             btn.classList.add('active');
         }
     });
+
+    // Show receipt if it exists
+    const receiptThumb = document.getElementById('editReceiptThumb');
+    const receiptThumbnail = document.getElementById('editReceiptThumbnail');
+    if (currentTransaction.receipt && receiptThumb && receiptThumbnail) {
+        receiptThumb.src = currentTransaction.receipt;
+        receiptThumbnail.style.display = 'block';
+        receiptThumb.onclick = () => openReceiptViewer(currentTransaction.receipt);
+    } else if (receiptThumbnail) {
+        receiptThumbnail.style.display = 'none';
+    }
 
     const modal = document.getElementById('editTransactionModal');
     if (modal) {
@@ -951,7 +1174,8 @@ function handleEditTransaction(e) {
         amount,
         type,
         category,
-        notes
+        notes,
+        receipt: currentTransaction.receipt || oldTxn.receipt || null
     };
 
     // Apply new balance change
@@ -1295,6 +1519,401 @@ function renderRecentTransactions(limit) {
             `).join('')}
         </div>
     `;
+}
+
+// ========================================
+// ANALYTICS & CHARTS
+// ========================================
+
+let currentPeriod = '1M'; // Default time period
+
+function calculateBalanceTrend() {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+    const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+
+    const currentBalance = appData.accounts.find(a => a.id === 'td').balance -
+                          appData.accounts.find(a => a.id === 'discover').balance;
+
+    // Calculate balance at end of last month
+    const transactionsThisMonth = appData.transactions.filter(txn => {
+        const txnDate = new Date(txn.date);
+        return txnDate.getMonth() === thisMonth && txnDate.getFullYear() === thisYear;
+    });
+
+    let lastMonthBalance = currentBalance;
+    transactionsThisMonth.forEach(txn => {
+        if (txn.type === 'expense') {
+            lastMonthBalance += txn.amount;
+        } else {
+            lastMonthBalance -= txn.amount;
+        }
+    });
+
+    const change = currentBalance - lastMonthBalance;
+    const percentChange = lastMonthBalance !== 0 ? (change / Math.abs(lastMonthBalance)) * 100 : 0;
+
+    return {
+        current: currentBalance,
+        previous: lastMonthBalance,
+        change: change,
+        percentChange: percentChange,
+        direction: change >= 0 ? 'up' : 'down'
+    };
+}
+
+function calculateCashFlow(period = '1M') {
+    const { startDate, endDate } = getPeriodDates(period);
+
+    const filtered = appData.transactions.filter(txn => {
+        const txnDate = new Date(txn.date);
+        return txnDate >= startDate && txnDate <= endDate;
+    });
+
+    const income = filtered
+        .filter(txn => txn.type === 'income')
+        .reduce((sum, txn) => sum + txn.amount, 0);
+
+    const expenses = filtered
+        .filter(txn => txn.type === 'expense')
+        .reduce((sum, txn) => sum + txn.amount, 0);
+
+    const netCashFlow = income - expenses;
+    const savingsRate = income > 0 ? ((income - expenses) / income * 100) : 0;
+
+    return { income, expenses, netCashFlow, savingsRate };
+}
+
+function getPeriodDates(period) {
+    const now = new Date();
+    const endDate = now;
+    let startDate;
+
+    switch (period) {
+        case '1M':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case '3M':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+            break;
+        case '1Y':
+            startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            break;
+        case 'YTD':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            break;
+        case 'MAX':
+            startDate = appData.transactions.length > 0
+                ? new Date(Math.min(...appData.transactions.map(t => new Date(t.date))))
+                : new Date(now.getFullYear(), 0, 1);
+            break;
+        default:
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    return { startDate, endDate };
+}
+
+function renderBalanceLineChart(canvasId, period = '1M') {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const { startDate, endDate } = getPeriodDates(period);
+
+    // Generate balance history points
+    const dataPoints = [];
+    const sortedTransactions = appData.transactions
+        .filter(txn => {
+            const txnDate = new Date(txn.date);
+            return txnDate >= startDate && txnDate <= endDate;
+        })
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Start with current balance and work backwards
+    let runningBalance = appData.accounts.find(a => a.id === 'td').balance -
+                        appData.accounts.find(a => a.id === 'discover').balance;
+
+    // Calculate balance at start of period
+    let startBalance = runningBalance;
+    [...sortedTransactions].reverse().forEach(txn => {
+        if (txn.type === 'expense') {
+            startBalance += txn.amount;
+        } else {
+            startBalance -= txn.amount;
+        }
+    });
+
+    // Build data points
+    dataPoints.push({ date: new Date(startDate), balance: startBalance });
+
+    let balance = startBalance;
+    sortedTransactions.forEach(txn => {
+        if (txn.type === 'expense') {
+            balance -= txn.amount;
+        } else {
+            balance += txn.amount;
+        }
+        dataPoints.push({ date: new Date(txn.date), balance });
+    });
+
+    // Add current point
+    dataPoints.push({ date: new Date(), balance: runningBalance });
+
+    if (dataPoints.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#636366';
+        ctx.font = '14px -apple-system';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data for this period', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Canvas dimensions
+    const width = canvas.width = canvas.offsetWidth * 2;
+    const height = canvas.height = canvas.offsetHeight * 2;
+    const padding = { top: 40, right: 40, bottom: 50, left: 60 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Find min/max for scaling
+    const balances = dataPoints.map(p => p.balance);
+    const minBalance = Math.min(...balances);
+    const maxBalance = Math.max(...balances);
+    const balanceRange = maxBalance - minBalance;
+    const yPadding = balanceRange * 0.1;
+
+    // Scale functions
+    const xScale = (date) => {
+        const timeDiff = endDate - startDate;
+        const pointDiff = date - startDate;
+        return padding.left + (pointDiff / timeDiff) * chartWidth;
+    };
+
+    const yScale = (balance) => {
+        return height - padding.bottom -
+               ((balance - minBalance + yPadding) / (balanceRange + yPadding * 2)) * chartHeight;
+    };
+
+    // Draw grid lines
+    ctx.strokeStyle = '#38383a';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (chartHeight / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+
+        // Y-axis labels
+        const value = maxBalance + yPadding - (balanceRange + yPadding * 2) * (i / 4);
+        ctx.fillStyle = '#8e8e93';
+        ctx.font = '24px -apple-system';
+        ctx.textAlign = 'right';
+        ctx.fillText(formatCurrency(value), padding.left - 10, y + 8);
+    }
+
+    // Draw line
+    ctx.strokeStyle = '#0a84ff';
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    dataPoints.forEach((point, i) => {
+        const x = xScale(point.date);
+        const y = yScale(point.balance);
+
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.stroke();
+
+    // Draw gradient fill
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
+    gradient.addColorStop(0, 'rgba(10, 132, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(10, 132, 255, 0)');
+    ctx.fillStyle = gradient;
+
+    ctx.beginPath();
+    dataPoints.forEach((point, i) => {
+        const x = xScale(point.date);
+        const y = yScale(point.balance);
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.lineTo(xScale(dataPoints[dataPoints.length - 1].date), height - padding.bottom);
+    ctx.lineTo(xScale(dataPoints[0].date), height - padding.bottom);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw dots
+    ctx.fillStyle = '#0a84ff';
+    dataPoints.forEach((point) => {
+        const x = xScale(point.date);
+        const y = yScale(point.balance);
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // X-axis labels
+    ctx.fillStyle = '#8e8e93';
+    ctx.font = '24px -apple-system';
+    ctx.textAlign = 'center';
+
+    const numLabels = Math.min(5, dataPoints.length);
+    for (let i = 0; i < numLabels; i++) {
+        const index = Math.floor((dataPoints.length - 1) * i / (numLabels - 1));
+        const point = dataPoints[index];
+        const x = xScale(point.date);
+        const label = formatDate(point.date, 'MMM DD');
+        ctx.fillText(label, x, height - 20);
+    }
+}
+
+function renderCategoryPieChart(canvasId, period = '1M') {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const { startDate, endDate } = getPeriodDates(period);
+
+    // Calculate category totals
+    const categoryTotals = {};
+    appData.transactions
+        .filter(txn => {
+            const txnDate = new Date(txn.date);
+            return txnDate >= startDate && txnDate <= endDate && txn.type === 'expense';
+        })
+        .forEach(txn => {
+            categoryTotals[txn.category] = (categoryTotals[txn.category] || 0) + txn.amount;
+        });
+
+    const sortedCategories = Object.entries(categoryTotals)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 8); // Top 8 categories
+
+    if (sortedCategories.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#636366';
+        ctx.font = '14px -apple-system';
+        ctx.textAlign = 'center';
+        ctx.fillText('No spending data', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    const width = canvas.width = canvas.offsetWidth * 2;
+    const height = canvas.height = canvas.offsetHeight * 2;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const centerX = width * 0.35;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) * 0.3;
+    const innerRadius = radius * 0.5;
+
+    // Color palette
+    const colors = [
+        '#0a84ff', '#30d158', '#ff453a', '#ff9f0a',
+        '#bf5af0', '#ff2d55', '#ffd60a', '#64d2ff'
+    ];
+
+    const total = sortedCategories.reduce((sum, [, amount]) => sum + amount, 0);
+
+    // Draw donut segments
+    let startAngle = -Math.PI / 2;
+    sortedCategories.forEach(([category, amount], i) => {
+        const sliceAngle = (amount / total) * Math.PI * 2;
+        const endAngle = startAngle + sliceAngle;
+
+        // Draw outer arc
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.arc(centerX, centerY, innerRadius, endAngle, startAngle, true);
+        ctx.closePath();
+        ctx.fill();
+
+        startAngle = endAngle;
+    });
+
+    // Draw legend
+    const legendX = width * 0.6;
+    const legendY = height * 0.15;
+    const legendSpacing = 50;
+
+    ctx.font = '28px -apple-system';
+    ctx.textAlign = 'left';
+
+    sortedCategories.forEach(([category, amount], i) => {
+        const y = legendY + i * legendSpacing;
+        const percentage = (amount / total * 100).toFixed(1);
+
+        // Color box
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillRect(legendX, y - 20, 30, 30);
+
+        // Category name
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(category, legendX + 45, y);
+
+        // Percentage
+        ctx.fillStyle = '#8e8e93';
+        ctx.fillText(`${percentage}%`, legendX + 45, y + 28);
+    });
+}
+
+function setPeriod(period) {
+    currentPeriod = period;
+
+    // Update active button state
+    document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.period === period) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Re-render charts
+    renderBalanceLineChart('balanceTrendChart', period);
+    renderCategoryPieChart('categoryPieChart', period);
+
+    // Update cash flow display
+    updateCashFlowDisplay(period);
+}
+
+function updateCashFlowDisplay(period) {
+    const { income, expenses, netCashFlow, savingsRate } = calculateCashFlow(period);
+
+    const cashFlowEl = document.getElementById('cashFlowValue');
+    const savingsRateEl = document.getElementById('savingsRateValue');
+    const incomeEl = document.getElementById('incomeValue');
+    const expensesEl = document.getElementById('expensesValue');
+
+    if (cashFlowEl) cashFlowEl.textContent = formatCurrency(netCashFlow);
+    if (savingsRateEl) savingsRateEl.textContent = `${savingsRate.toFixed(1)}%`;
+    if (incomeEl) incomeEl.textContent = formatCurrency(income);
+    if (expensesEl) expensesEl.textContent = formatCurrency(expenses);
+
+    // Update color
+    if (cashFlowEl) {
+        cashFlowEl.className = 'stat-value ' + (netCashFlow >= 0 ? 'positive' : 'negative');
+    }
+    if (savingsRateEl) {
+        savingsRateEl.className = 'stat-value ' + (savingsRate >= 0 ? 'positive' : 'negative');
+    }
 }
 
 // ========================================
